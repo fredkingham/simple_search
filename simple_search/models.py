@@ -176,13 +176,19 @@ def search(model_class, search_string, per_page=50, current_page=1, total_pages=
     for index, (score, pk) in enumerate(final_weights):
         order[pk] = index
 
-    sorted_results = [None] * len(order.keys())
+
 
     queryset = model_class.objects.all()
     if filters:
         queryset = queryset.filter(**filters)
 
-    results = queryset.filter(pk__in=order.keys())
+    # Workaround for an obscure bug when using datastore_utils.CachingQuerySet
+    # that returns no results when filtering by pk at this point.
+    # Feel free to investigate and fix it if you have any insight.
+    # results = queryset.filter(pk__in=order.keys())
+    results = [r for r in queryset if r.pk in order.keys()]
+    sorted_results = [None] * len(results)
+
     for result in results:
         position = order[result.pk]
         sorted_results[position] = result
