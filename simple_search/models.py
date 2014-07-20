@@ -87,55 +87,8 @@ class AbstractIndex(models.Model):
                 )
                 continue
 
-    def search(self, model_class, search_string, per_page=50, current_page=1, total_pages=10, **filters):
-        terms = self.parse_terms(search_string)
-
-        instance_weights = self._get_matches(model_class, terms)
-
-        final_weights = []
-        for k, v in instance_weights.items():
-            """
-                This is where we rank the results. Lower scores are better. Scores are based
-                on the commonality of the word. More matches are rewarded, but not too much so
-                that rarer terms still have a chance.
-
-                Examples for n matches:
-
-                1 = 1 + (0 * 0.5) = 1    -> scores / 1
-                2 = 2 + (1 * 0.5) = 2.5  -> scores / 2.5 (rather than 2)
-                3 = 3 + (2 * 0.5) = 4    -> scores / 4 (rather than 3)
-            """
-
-            n = float(len(v))
-            final_weights.append((sum(v) / (n + ((n-1) * 0.5)), k))
-
-        final_weights.sort()
-
-        final_weights = final_weights[:total_pages*per_page]
-        #Restrict to the page
-        offset = ((current_page - 1) * per_page)
-        final_weights = final_weights[offset:offset + per_page]
-
-        order = {}
-        for index, (score, pk) in enumerate(final_weights):
-            order[pk] = index
-
-        queryset = model_class.objects.all()
-        if filters:
-            queryset = queryset.filter(**filters)
-
-        # Workaround for an obscure bug when using datastore_utils.CachingQuerySet
-        # that returns no results when filtering by pk at this point.
-        # Feel free to investigate and fix it if you have any insight.
-        # results = queryset.filter(pk__in=order.keys())
-        results = [r for r in queryset if r.pk in order.keys()]
-        sorted_results = [None] * len(results)
-
-        for result in results:
-            position = order[result.pk]
-            sorted_results[position] = result
-
-        return sorted_results
+    def search(self):
+        raise NotImplementedError("Subclasses should implement this.")
 
     @classmethod
     def parse_terms(cls, search_string):
@@ -171,7 +124,8 @@ class AbstractIndex(models.Model):
             n = float(len(v))
             final_weights.append((sum(v) / (n + ((n-1) * 0.5)), k))
 
-        return final_weights.sort()
+        final_weights.sort()
+        return final_weights
 
     def _apply_paging_to_results(self, final_weights, per_page, current_page, total_pages):
         #Restrict to the max possible
@@ -228,7 +182,7 @@ class Index(AbstractIndex):
         return [value]
 
     def _get_matches(self, model_class, terms):
-        matching_terms = dict(GlobalOccuranceCount.objects.filter(pk__in=terms).values_list('pk', 'count'))
+        matching_terms = dict(list(GlobalOccuranceCount.objects.filter(pk__in=terms).values_list('pk', 'count')))
         matches = Index.objects.filter(iexact__in=terms, instance_db_table=model_class._meta.db_table).all()
 
         instance_weights = {}
@@ -286,6 +240,36 @@ class Index(AbstractIndex):
                                 logging.warning("Transaction collision, retrying!")
                                 time.sleep(1)
                                 continue
+
+    def search(self, model_class, search_string, per_page=50, current_page=1, total_pages=10, **filters):
+        terms = self.parse_terms(search_string)
+
+        instance_weights = self._get_matches(model_class, terms)
+
+        final_weights = []
+        final_weights = self._weight_results(instance_weights)
+        final_weights = self._apply_paging_to_results(final_weights, per_page, current_page, total_pages)
+
+        order = {}
+        for index, (score, pk) in enumerate(final_weights):
+            order[pk] = index
+
+        queryset = model_class.objects.all()
+        if filters:
+            queryset = queryset.filter(**filters)
+
+        # Workaround for an obscure bug when using datastore_utils.CachingQuerySet
+        # that returns no results when filtering by pk at this point.
+        # Feel free to investigate and fix it if you have any insight.
+        # results = queryset.filter(pk__in=order.keys())
+        results = [r for r in queryset if r.pk in order.keys()]
+        sorted_results = [None] * len(results)
+
+        for result in results:
+            position = order[result.pk]
+            sorted_results[position] = result
+
+        return sorted_results
 
 from django.dispatch import receiver
 from django.db.models.signals import post_save, pre_delete
