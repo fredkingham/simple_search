@@ -1,6 +1,7 @@
 This is a really basic search engine for Django. To use, simply add simple_search to INSTALLED_APPS
 and register models for searching as follows:
 
+
 class MyModel(Model):
     field1 = models.CharField(max_length=1000)
 
@@ -10,9 +11,10 @@ class MyModel(Model):
          ]
 
 
-Then import simple_search.models.search and call:
+Then import simple_search.models.Index and call search:
 
-search(MyModel, 'this is a "search string"')
+from simple_search.models import Index
+Index.search(MyModel, 'this is a "search string"')
 
 search() can take pagination options. There is still plenty unimplemented (see the comment in models.py)
 
