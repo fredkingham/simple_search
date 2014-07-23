@@ -13,7 +13,8 @@ from django.db import models
 from django.test import TestCase
 #from potatobase.testbase import PotatoTestCase
 
-from .models import AbstractIndex, Index, GlobalOccuranceCount
+from .base_models import AbstractIndex, GlobalOccuranceCount
+from .models import Index
 
 
 class MockRelatedManager(object):
