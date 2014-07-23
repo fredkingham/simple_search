@@ -6,22 +6,42 @@ Replace this with more appropriate tests for your application.
 """
 
 import unittest
+import mock
+
+from djangae.fields import ListField
 from django.db import models
 from django.test import TestCase
-from potatobase.testbase import PotatoTestCase
+#from potatobase.testbase import PotatoTestCase
 
-from .models import Index, GlobalOccuranceCount
+from .models import AbstractIndex, Index, GlobalOccuranceCount
+
+
+class MockRelatedManager(object):
+    def __init__(self, retval):
+        self.retval = retval
+
+    def all(self):
+        return self.retval
 
 
 class SampleModel(models.Model):
     field1 = models.CharField(max_length=1024)
     field2 = models.CharField(max_length=1024)
+    list_field = ListField(default=[])
+
+    related_field = models.ForeignKey('self', blank=True, null=True)
 
     def __unicode__(self):
         return u"{} - {}".format(self.field1, self.field2)
 
 
-class SearchTests(PotatoTestCase):
+class TestIndex(AbstractIndex):
+    """ Could just use Index, but this is the most minimal index possible. """
+    obj_reference = models.CharField(max_length=255)
+    OBJECT_ID_FIELD = 'obj_reference'
+
+
+class SearchTests(TestCase):
     def test_field_indexing(self):
         instance1 = SampleModel.objects.create(
             field1="bananas apples cherries plums oranges kiwi"
@@ -134,3 +154,27 @@ class SearchTests(PotatoTestCase):
 
         self.assertItemsEqual([], i.search(SampleModel, "banana AND apple"))
         self.assertItemsEqual([instance2], i.search(SampleModel, "apple OR cherry"))
+
+
+
+class IndexTests(TestCase):
+    def setUp(self):
+        self.index = TestIndex()
+
+    def test_get_dict_data(self):
+        """ Tests getting data from indexable objects, both plain (dict) ones and django instances. """
+        obj = {'somelist':[1,2,3], 'something else': 'horplecrump'}
+
+        self.assertEqual(self.index.get_field_data('somelist', obj), [1, 2, 3])
+        self.assertEqual(self.index.get_field_data('something else', obj), ['horplecrump'])
+
+    def test_get_model_data(self):
+        """ Tests getting data from indexable objects, both plain (dict) ones and django instances. """
+        obj = SampleModel(list_field=[1,2,3], field1='horplecrump')
+        obj2 = SampleModel(related_field=obj)
+
+        self.assertEqual(self.index.get_field_data('list_field', obj), [1, 2, 3])
+        self.assertEqual(self.index.get_field_data('field1', obj), ['horplecrump'])
+
+        with mock.patch('simple_search.tests.SampleModel.samplemodel_set', new=MockRelatedManager(retval=[obj2])):
+            self.index.get_field_data('samplemodel_set__field1', obj)
