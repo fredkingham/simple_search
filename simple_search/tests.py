@@ -179,3 +179,16 @@ class IndexTests(TestCase):
 
         with mock.patch('simple_search.tests.SampleModel.samplemodel_set', new=MockRelatedManager(retval=[obj2])):
             self.index.get_field_data('samplemodel_set__field1', obj)
+
+class UniquenessTests(TestCase):
+    def setUp(self):
+        self.index = Index()
+
+    def test_index_uniqueness(self):
+        """ Test an object can be indexed if it contains non-unique data in different fields.
+            This is to make sure unique_together on Index is set up right.
+        """
+        obj = SampleModel(id=1, list_field=[1,2,3], field1='horplecrump', field2='horplecrump')
+
+        with mock.patch('simple_search.tests.TestIndex._get_records', return_value=[]):
+            self.index.reindex(obj, fields_to_index=['field1', 'field2'])

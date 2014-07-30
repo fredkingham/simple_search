@@ -36,6 +36,7 @@ class GlobalOccuranceCount(models.Model):
 class AbstractIndex(models.Model):
     iexact = models.CharField(max_length=1024)
     occurances = models.PositiveIntegerField(default=0)
+    field = models.CharField(max_length=100) # Field on indexed obj containing iexact
 
     class Meta:
         abstract = True
@@ -55,9 +56,9 @@ class AbstractIndex(models.Model):
         """ Get all index records that belong to an object. """
         raise NotImplementedError("Subclasses should implement this.")
 
-    def create_record(self, obj, iexact, occurances):
-        """ Create a record from an object, its iexact text and the number of occurances. """
-        NotImplementedError("Subclasses should implement this.")
+    def create_record(self, obj, field, iexact, occurances):
+        """ Create a record from an object, its iexact text, field containg the text, and the number of occurances. """
+        raise NotImplementedError("Subclasses should implement this.")
 
     def search(self, *args, **kwargs):
         """ Perform a search on the index. """
@@ -148,6 +149,7 @@ class AbstractIndex(models.Model):
         """
         for field in fields_to_index:
             texts = self.get_field_data(field, obj)
+
             for text in texts:
                 terms = self._generate_terms(text)
                 for term in terms:
@@ -156,12 +158,11 @@ class AbstractIndex(models.Model):
                         logging.info("Indexing: '%s', %s", term_, type(term_))
 
                         term_count = self.normalize(text).count(term_)
-                        self.create_record(obj, term_, term_count)
+                        self.create_record(obj, field, term_, term_count)
 
                         counter, created = GlobalOccuranceCount.objects.get_or_create(pk=term_)
                         counter.count += term_count
                         counter.save()
-
                     while True:
                         try:
                             txn(term)

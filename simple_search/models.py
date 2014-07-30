@@ -20,17 +20,18 @@ class Index(AbstractIndex):
 
     class Meta:
         unique_together = [
-            ('iexact', 'instance_db_table', 'instance_pk')
+            ('iexact', 'field', 'instance_db_table', 'instance_pk')
         ]
 
     OBJECT_ID_FIELD = 'instance_pk'
 
-    def create_record(self, obj, iexact, occurances):
+    def create_record(self, obj, field, iexact, occurances):
         """ Create an index record from django model instance obj """
         Index.objects.create(
             iexact=iexact,
             instance_db_table=obj._meta.db_table,
             instance_pk=obj.pk,
+            field=field,
             occurances=occurances
         )
 
