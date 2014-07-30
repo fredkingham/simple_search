@@ -255,7 +255,7 @@ class AbstractIndex(models.Model):
 
     def _get_dict_data(self, field, obj):
         data = obj[field]
-        if isinstance(data, list) or isinstance(data, tuple):
+        if type(data) in (list, tuple):
             return data
         return [obj[field]]
 
@@ -268,15 +268,20 @@ class AbstractIndex(models.Model):
 
             if the object is a dictionary, it will simply return [obj[field]].
 
-            To customise this behaviour, override _get_*_data functions as necessary, which should always returns lists of values
+            To customise this behaviour, override _get_*_data magic methods as necessary, which should always returns lists of values
         """
 
+        obj_classname = obj.__class__.__name__.lower()
+
+        get_data_method = getattr(self.__class__, "_get_%s_data" % obj_classname, None)
+        if get_data_method:
+            return get_data_method(self, field, obj)
+
+        # If no specific method was defined, but the object is a model instance, use the generic _get_model_data
         if isinstance(obj, models.Model):
             return self._get_model_data(field, obj)
-        elif isinstance(obj, dict):
-            return self._get_dict_data(field, obj)
 
-        raise Exception("Object type %s is not supported by index. Add a get_<type>_data function to support it.", type(obj))
+        raise Exception("Object type %s is not supported by index. Add a get_<type.lower()>_data function to support it.", obj_classname)
 
     @staticmethod
     def normalize(s):
