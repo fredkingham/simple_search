@@ -58,8 +58,11 @@ class AbstractIndexRecord(models.Model):
         @db.transactional(xg=True)
         def txn(record):
             count = GlobalOccuranceCount.objects.get(pk=record.iexact)
-            count.count -= record.occurances
-            count.save()
+            if count.count <= record.occurances:
+                count.delete()
+            else:
+                count.count -= record.occurances
+                count.save()
             super(AbstractIndexRecord, record).delete()
 
         try:
