@@ -33,7 +33,7 @@ class GlobalOccuranceCount(models.Model):
                 continue
 
 
-class AbstractIndex(models.Model):
+class AbstractIndexRecord(models.Model):
     iexact = models.CharField(max_length=1024)
     occurances = models.PositiveIntegerField(default=0)
     field = models.CharField(max_length=100) # Field on indexed obj containing iexact
@@ -44,13 +44,46 @@ class AbstractIndex(models.Model):
     def __init__(self, *args, **kwargs):
         if not self.__class__.OBJECT_ID_FIELD:
             raise Exception("Simple_search misconfigured, no OBJECT_ID_FIELD set in class %s" % self.__class__)
-        super(AbstractIndex, self).__init__(*args, **kwargs)
+        super(AbstractIndexRecord, self).__init__(*args, **kwargs)
 
     # Override the following methods and set following attributes in inheriting classes
 
     # Field in the index used to identify the indexed object. This could be the primary key of a django object,
     # or any kind of resource identifier.
     OBJECT_ID_FIELD = ''
+
+    def delete(self):
+        """ Remove a single index record. """
+
+        @db.transactional(xg=True)
+        def txn(record):
+            count = GlobalOccuranceCount.objects.get(pk=record.iexact)
+            count.count -= record.occurances
+            count.save()
+            super(AbstractIndexRecord, record).delete()
+
+        try:
+            while True:
+                try:
+                    txn(self)
+                    break
+                except db.TransactionFailedError:
+                    logging.warning("Transaction collision, retrying!")
+                    time.sleep(1)
+                    continue
+        except GlobalOccuranceCount.DoesNotExist:
+            logging.warning(
+                "A GlobalOccuranceCount for Index: %s "
+                "does not exist, ignoring", self.pk
+            )
+
+
+class AbstractIndex(object):
+    indexrecord_class = None
+
+    def __init__(self):
+        if not getattr(self, 'indexrecord_class', None):
+            raise Exception("Misconfigured %s: indexrecord_class needs to be set." % self.__class__)
 
     def _get_records(self, obj):
         """ Get all index records that belong to an object. """
@@ -86,31 +119,6 @@ class AbstractIndex(models.Model):
         records = self._get_records(obj)
         for record in records:
             record.delete()
-
-    def delete(self):
-        """ Remove a single index record. """
-
-        @db.transactional(xg=True)
-        def txn(record):
-            count = GlobalOccuranceCount.objects.get(pk=record.iexact)
-            count.count -= record.occurances
-            count.save()
-            super(AbstractIndex, record).delete()
-
-        try:
-            while True:
-                try:
-                    txn(self)
-                    break
-                except db.TransactionFailedError:
-                    logging.warning("Transaction collision, retrying!")
-                    time.sleep(1)
-                    continue
-        except GlobalOccuranceCount.DoesNotExist:
-            logging.warning(
-                "A GlobalOccuranceCount for Index: %s "
-                "does not exist, ignoring", self.pk
-            )
 
     def _generate_terms(self, text):
         """ Takes a string, splits it into words and generates a list of combinations of adjacent words.

@@ -1,6 +1,6 @@
 from django.db import models
 
-from base_models import AbstractIndex
+from base_models import AbstractIndex, AbstractIndexRecord
 
 
 """
@@ -14,7 +14,7 @@ from base_models import AbstractIndex
 """
 
 
-class Index(AbstractIndex):
+class IndexRecord(AbstractIndexRecord):
     instance_db_table = models.CharField(max_length=1024)
     instance_pk = models.PositiveIntegerField(default=0)
 
@@ -25,9 +25,12 @@ class Index(AbstractIndex):
 
     OBJECT_ID_FIELD = 'instance_pk'
 
+class Index(AbstractIndex):
+    indexrecord_class = IndexRecord
+
     def create_record(self, obj, field, iexact, occurances):
         """ Create an index record from django model instance obj """
-        Index.objects.create(
+        self.indexrecord_class.objects.create(
             iexact=iexact,
             instance_db_table=obj._meta.db_table,
             instance_pk=obj.pk,
@@ -36,7 +39,7 @@ class Index(AbstractIndex):
         )
 
     def _get_records(self, instance):
-        return Index.objects.filter(
+        return self.indexrecord_class.objects.filter(
             instance_db_table=instance._meta.db_table, instance_pk=instance.pk).all()
 
     def search(self, model_class, search_string, per_page=50, current_page=1, total_pages=10, **filters):
@@ -61,6 +64,7 @@ class Index(AbstractIndex):
             sorted_results[position] = result
 
         return sorted_results
+index = Index()
 
 from django.dispatch import receiver
 from django.db.models.signals import post_save, pre_delete
@@ -71,10 +75,10 @@ def post_save_index(sender, instance, created, raw, *args, **kwargs):
     if getattr(instance, "Search", None):
         fields_to_index = getattr(instance.Search, "fields", [])
         if fields_to_index:
-            Index.index(instance, fields_to_index, defer_index=not raw)  # Don't defer if we are loading from a fixture
+            index.index(instance, fields_to_index, defer_index=not raw)  # Don't defer if we are loading from a fixture
 
 
 @receiver(pre_delete)
 def pre_delete_unindex(sender, instance, using, *args, **kwarg):
     if getattr(instance, "Search", None):
-        Index.unindex(instance)
+        index.unindex(instance)
