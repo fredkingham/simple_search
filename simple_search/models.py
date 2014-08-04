@@ -60,6 +60,8 @@ class Index(AbstractIndex):
             position = order[result.pk]
             sorted_results[position] = result
 
+        # Remove results that were filtered out from sorted_results
+        sorted_results = [x for x in sorted_results if x is not None]
         return sorted_results
 index = Index()
 
