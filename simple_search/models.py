@@ -48,16 +48,13 @@ class Index(AbstractIndex):
         obj_weights = self._get_matches(terms, extra_filters={'instance_db_table':model_class._meta.db_table})
         order = self._get_result_order(obj_weights, per_page, current_page, total_pages)
 
+        sorted_results = [None] * len(order.keys())
+
         queryset = model_class.objects.all()
         if filters:
             queryset = queryset.filter(**filters)
 
-        # Workaround for an obscure bug when using datastore_utils.CachingQuerySet
-        # that returns no results when filtering by pk at this point.
-        # Feel free to investigate and fix it if you have any insight.
-        # results = queryset.filter(pk__in=order.keys())
-        results = [r for r in queryset if r.pk in order.keys()]
-        sorted_results = [None] * len(results)
+        results = queryset.filter(pk__in=order.keys())
 
         for result in results:
             position = order[result.pk]
