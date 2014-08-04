@@ -102,19 +102,19 @@ class SearchTests(TestCase):
         instance3 = SampleModel.objects.create(field1="BANANA")
 
         index.index(instance1, ["field1", "field2"], defer_index=False)
-        self.assertEqual(2, index.objects.count())
+        self.assertEqual(2, IndexRecord.objects.count())
         self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="banana").count)
         self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="apple").count)
 
         index.index(instance2, ["field1", "field2"], defer_index=False)
 
-        self.assertEqual(4, index.objects.count())
+        self.assertEqual(4, IndexRecord.objects.count())
         self.assertEqual(2, GlobalOccuranceCount.objects.get(pk="banana").count)
         self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="apple").count)
         self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="cherry").count)
 
         index.index(instance3, ["field1"], defer_index=False)
-        self.assertEqual(5, index.objects.count())
+        self.assertEqual(5, IndexRecord.objects.count())
         self.assertEqual(3, GlobalOccuranceCount.objects.get(pk="banana").count)
         self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="apple").count)
         self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="cherry").count)
@@ -188,4 +188,4 @@ class UniquenessTests(TestCase):
         obj = SampleModel(id=1, list_field=[1,2,3], field1='horplecrump', field2='horplecrump')
 
         with mock.patch('simple_search.tests.TestIndex._get_records', return_value=[]):
-            test_index.reindex(obj, fields_to_index=['field1', 'field2'])
+            index.reindex(obj, fields_to_index=['field1', 'field2'])

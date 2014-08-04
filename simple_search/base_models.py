@@ -224,7 +224,7 @@ class AbstractIndex(object):
         if extra_filters:
             filter_args.update(extra_filters)
 
-        matches = self.__class__.objects.filter(**filter_args).all()
+        matches = self.indexrecord_class.objects.filter(**filter_args).all()
 
         obj_weights = {}
 
