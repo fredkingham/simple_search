@@ -8,7 +8,11 @@ Replace this with more appropriate tests for your application.
 import unittest
 import mock
 
-from djangae.fields import ListField
+try:
+    from djangae.fields import ListField
+except ImportError:
+    from djangotoolbox.fields import ListField
+
 from django.db import models
 from django.test import TestCase
 #from potatobase.testbase import PotatoTestCase
