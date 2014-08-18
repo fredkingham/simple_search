@@ -201,7 +201,8 @@ class AbstractIndex(object):
             n = float(len(v))
             final_weights.append((sum(v) / (n + ((n-1) * 0.5)), k))
 
-        final_weights.sort()
+        final_weights.sort(key=lambda x: x[0])
+
         return final_weights
 
     def _get_result_order(self, obj_weights, per_page, current_page, total_pages):
@@ -217,10 +218,9 @@ class AbstractIndex(object):
         return order
 
     def _get_matches(self, terms, extra_filters=None):
-        """ Get matching terms from the global occurance counts. """
         matching_terms = dict(list(GlobalOccuranceCount.objects.filter(pk__in=terms).values_list('pk', 'count')))
 
-        filter_args = {'iexact__in':terms}
+        filter_args = {'iexact__in': terms}
         if extra_filters:
             filter_args.update(extra_filters)
 
@@ -229,8 +229,7 @@ class AbstractIndex(object):
         obj_weights = {}
 
         for match in matches:
-            obj_identifier = getattr(match, match.OBJECT_ID_FIELD)
-            obj_weights.setdefault(obj_identifier, []).append(matching_terms[match.iexact])
+            obj_weights.setdefault(match, []).append(matching_terms[match.iexact])
 
         return obj_weights
 

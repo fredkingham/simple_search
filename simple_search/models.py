@@ -45,24 +45,33 @@ class Index(AbstractIndex):
     def search(self, model_class, search_string, per_page=50, current_page=1, total_pages=10, **filters):
         terms = self.parse_terms(search_string)
 
-        obj_weights = self._get_matches(terms, extra_filters={'instance_db_table':model_class._meta.db_table})
+        obj_weights = self._get_matches(terms, extra_filters={'instance_db_table': model_class._meta.db_table})
         order = self._get_result_order(obj_weights, per_page, current_page, total_pages)
 
-        sorted_results = [None] * len(order.keys())
+        instance_pks = [x.instance_pk for x in order.keys()]
 
         queryset = model_class.objects.all()
+
         if filters:
             queryset = queryset.filter(**filters)
 
-        results = queryset.filter(pk__in=order.keys())
+        results = queryset.filter(pk__in=instance_pks)
+        results_by_pk = {x.pk: x for x in results}
 
-        for result in results:
-            position = order[result.pk]
-            sorted_results[position] = result
+        # remove duplicates, maintain the order, exclude items that are excluded by the filters
+        seen = set()
 
-        # Remove results that were filtered out from sorted_results
-        sorted_results = [x for x in sorted_results if x is not None]
-        return sorted_results
+        sorted_instances = []
+
+        for result in order.keys():
+            if result.instance_pk not in seen:
+                if result.instance_pk in results_by_pk:
+                    sorted_instances.append(results_by_pk[result.instance_pk])
+                    seen.add(result.instance_pk)
+
+        return sorted_instances
+
+
 index = Index()
 
 from django.dispatch import receiver
