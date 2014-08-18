@@ -63,7 +63,10 @@ class Index(AbstractIndex):
 
         sorted_instances = []
 
-        for result in order.keys():
+        unordered = ((instance, enumerator,) for instance, enumerator in order.items())
+
+        sorted_order = sorted(unordered, key=lambda x: x[1])
+        for result, _ in sorted_order:
             if result.instance_pk not in seen:
                 if result.instance_pk in results_by_pk:
                     sorted_instances.append(results_by_pk[result.instance_pk])

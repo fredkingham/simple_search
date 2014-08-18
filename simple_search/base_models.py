@@ -196,10 +196,10 @@ class AbstractIndex(object):
             3 = 3 + (2 * 0.5) = 4    -> scores / 4 (rather than 3)
         """
         final_weights = []
-        for k, v in obj_weights.items():
+        for record, matching_terms in obj_weights.items():
 
-            n = float(len(v))
-            final_weights.append((sum(v) / (n + ((n-1) * 0.5)), k))
+            n = float(len(matching_terms))
+            final_weights.append((sum(matching_terms) / (n + ((n-1) * 0.5)), record))
 
         final_weights.sort(key=lambda x: x[0])
 
@@ -213,8 +213,8 @@ class AbstractIndex(object):
         final_weights = self._apply_paging_to_results(final_weights, per_page, current_page, total_pages)
 
         order = {}
-        for index, (score, pk) in enumerate(final_weights):
-            order[pk] = index
+        for index, (score, match) in enumerate(final_weights):
+            order[match] = index
         return order
 
     def _get_matches(self, terms, extra_filters=None):
