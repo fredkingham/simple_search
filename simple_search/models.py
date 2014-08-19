@@ -25,6 +25,7 @@ class IndexRecord(AbstractIndexRecord):
 
     OBJECT_ID_FIELD = 'instance_pk'
 
+
 class Index(AbstractIndex):
     indexrecord_class = IndexRecord
 
@@ -46,9 +47,9 @@ class Index(AbstractIndex):
         terms = self.parse_terms(search_string)
 
         obj_weights = self._get_matches(terms, extra_filters={'instance_db_table': model_class._meta.db_table})
-        order = self._get_result_order(obj_weights, per_page, current_page, total_pages)
+        matches_in_order = self._get_result_order(obj_weights, per_page, current_page, total_pages)
 
-        instance_pks = [x.instance_pk for x in order.keys()]
+        instance_pks = [x.instance_pk for x in matches_in_order]
 
         queryset = model_class.objects.all()
 
@@ -58,15 +59,12 @@ class Index(AbstractIndex):
         results = queryset.filter(pk__in=instance_pks)
         results_by_pk = {x.pk: x for x in results}
 
-        # remove duplicates, maintain the order, exclude items that are excluded by the filters
+        # remove duplicates, maintain the matches_in_order, exclude items that are excluded by the filters
         seen = set()
 
         sorted_instances = []
 
-        unordered = ((instance, enumerator,) for instance, enumerator in order.items())
-
-        sorted_order = sorted(unordered, key=lambda x: x[1])
-        for result, _ in sorted_order:
+        for result in matches_in_order:
             if result.instance_pk not in seen:
                 if result.instance_pk in results_by_pk:
                     sorted_instances.append(results_by_pk[result.instance_pk])

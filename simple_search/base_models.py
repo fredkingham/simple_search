@@ -212,10 +212,8 @@ class AbstractIndex(object):
         final_weights = self._weight_results(obj_weights)
         final_weights = self._apply_paging_to_results(final_weights, per_page, current_page, total_pages)
 
-        order = {}
-        for index, (score, match) in enumerate(final_weights):
-            order[match] = index
-        return order
+        # just return the match objects
+        return [x[1] for x in final_weights]
 
     def _get_matches(self, terms, extra_filters=None):
         matching_terms = dict(list(GlobalOccuranceCount.objects.filter(pk__in=terms).values_list('pk', 'count')))
