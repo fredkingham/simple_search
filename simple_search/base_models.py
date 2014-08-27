@@ -136,7 +136,7 @@ class AbstractIndex(object):
 
         text = self.normalize(text)
 
-        words = text.split(" ")  # Split on whitespace
+        words = text.split()  # Split on whitespace
 
         terms = []
         #Build up combinations of adjacent words
