@@ -200,12 +200,13 @@ class AbstractIndex(object):
             3 = 3 + (2 * 0.5) = 4    -> scores / 4 (rather than 3)
         """
         final_weights = []
-        for k, v in obj_weights.items():
+        for record, matching_terms in obj_weights.items():
 
-            n = float(len(v))
-            final_weights.append((sum(v) / (n + ((n-1) * 0.5)), k))
+            n = float(len(matching_terms))
+            final_weights.append((sum(matching_terms) / (n + ((n-1) * 0.5)), record))
 
-        final_weights.sort()
+        final_weights.sort(key=lambda x: x[0])
+
         return final_weights
 
     def _get_result_order(self, obj_weights, per_page, current_page, total_pages):
@@ -215,16 +216,13 @@ class AbstractIndex(object):
         final_weights = self._weight_results(obj_weights)
         final_weights = self._apply_paging_to_results(final_weights, per_page, current_page, total_pages)
 
-        order = {}
-        for index, (score, pk) in enumerate(final_weights):
-            order[pk] = index
-        return order
+        # just return the match objects
+        return [x[1] for x in final_weights]
 
     def _get_matches(self, terms, extra_filters=None):
-        """ Get matching terms from the global occurance counts. """
         matching_terms = dict(list(GlobalOccuranceCount.objects.filter(pk__in=terms).values_list('pk', 'count')))
 
-        filter_args = {'iexact__in':terms}
+        filter_args = {'iexact__in': terms}
         if extra_filters:
             filter_args.update(extra_filters)
 
@@ -233,8 +231,7 @@ class AbstractIndex(object):
         obj_weights = {}
 
         for match in matches:
-            obj_identifier = getattr(match, match.OBJECT_ID_FIELD)
-            obj_weights.setdefault(obj_identifier, []).append(matching_terms[match.iexact])
+            obj_weights.setdefault(match, []).append(matching_terms[match.iexact])
 
         return obj_weights
 
