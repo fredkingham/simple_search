@@ -28,9 +28,11 @@ class IndexRecord(AbstractIndexRecord):
 class Index(AbstractIndex):
     indexrecord_class = IndexRecord
 
-    def create_record(self, obj, field, iexact, occurances):
-        """ Create an index record from django model instance obj """
-        self.indexrecord_class.objects.create(
+    def get_or_create_record(self, obj, field, iexact, occurances):
+        """ Create an index record from django model instance obj
+            Returns a tuple of (record, created)
+        """
+        return self.indexrecord_class.objects.get_or_create(
             iexact=iexact,
             instance_db_table=obj._meta.db_table,
             instance_pk=obj.pk,

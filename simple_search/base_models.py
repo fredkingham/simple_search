@@ -92,8 +92,10 @@ class AbstractIndex(object):
         """ Get all index records that belong to an object. """
         raise NotImplementedError("Subclasses should implement this.")
 
-    def create_record(self, obj, field, iexact, occurances):
-        """ Create a record from an object, its iexact text, field containg the text, and the number of occurances. """
+    def get_or_create_record(self, obj, field, iexact, occurances):
+        """ Simple wrapper around get_or_create to all different index classes to specify how to create the record.
+            Returns a tuple of (record, created), just like get_or_create
+        """
         raise NotImplementedError("Subclasses should implement this.")
 
     def search(self, *args, **kwargs):
@@ -164,12 +166,14 @@ class AbstractIndex(object):
             for text in texts:
                 terms = self._generate_terms(text)
                 for term in terms:
-                    @db.transactional(xg=True)
+                    # FIXME: I've had to disable this transaction because get_or_create doesn't work inside transactions
+                    # It also doesn't (reliably) work outside transactions. This can be reenabled once djangae has unique-caching.
+                    #@db.transactional(xg=True)
                     def txn(term_):
                         logging.info("Indexing: '%s', %s", term_, type(term_))
 
                         term_count = self.normalize(text).count(term_)
-                        self.create_record(obj, field, term_, term_count)
+                        self.get_or_create_record(obj, field, term_, term_count)
 
                         counter, created = GlobalOccuranceCount.objects.get_or_create(pk=term_)
                         counter.count += term_count
