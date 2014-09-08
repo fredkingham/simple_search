@@ -189,3 +189,12 @@ class UniquenessTests(TestCase):
 
         with mock.patch('simple_search.tests.TestIndex._get_records', return_value=[]):
             index.reindex(obj, fields_to_index=['field1', 'field2'])
+
+class ParseTermsTests(TestCase):
+    def test_parse_terms(self):
+        self.assertEqual(AbstractIndex.parse_terms('"This:isn\'t a field"'), {None:["this:isn't a field"]})
+        self.assertEqual(AbstractIndex.parse_terms("test"), {None:["test"]})
+        self.assertEqual(AbstractIndex.parse_terms("test field:test1, other_field:test2"), {None:["test"], "field":["test1"], "other_field":["test2"]})
+        self.assertEqual(AbstractIndex.parse_terms("test1 test2"), {None:["test1", "test2"]})
+        self.assertEqual(AbstractIndex.parse_terms("This: is multiple things"), {None:["this:", "is", "multiple", "things"]})
+        self.assertEqual(AbstractIndex.parse_terms("This:is also multiple things"), {"this":["is"], None:["also", "multiple", "things"]})

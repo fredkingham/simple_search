@@ -1,5 +1,5 @@
 import logging
-import shlex
+import re
 import time
 
 from django.db import models
@@ -304,4 +304,37 @@ class AbstractIndex(object):
 
     @classmethod
     def parse_terms(cls, search_string):
-        return shlex.split(cls.normalize(search_string))
+        """ For a string containing several search terms, which can have be labeled and/or grouped with quotes,
+            this returns a dict of {label:[search_tokens]}
+
+            Examples:
+            "This:isn't a field" -> {None: ["This:isn't a field"]}
+            This:"is a field" -> {"This": ["is a field"]}
+            This:is multiple things -> {"This": ["is"], None: ["multiple", "things"]}
+        """
+        search_string = cls.normalize(search_string)
+
+        split_by_space = r'(?:[^\s,"]|"(?:\\.|[^"])*")+'
+        split_field = r'^(?P<field>[^:"]+):[^ ]+'
+
+        def get_field_content(token, field):
+            if field:
+                token = re.sub(field+":", '', token)
+
+            if token.startswith('"') and token.endswith('"'):
+                token = token[1:-1]
+
+            return field, token
+
+        # Separate search text into two lists with one entry per search term:
+        #   fields: field name to be searched(or None)
+        #   search_strings: actual string to search for
+        tokens = [s for s in re.findall(split_by_space, search_string)]
+        fields = [match[0] if len(match) == 1 else None for match in [re.findall(split_field, token) for token in tokens]]
+        field_contents = map(get_field_content, tokens, fields)
+
+        parsed_terms = {}
+        for field, token in field_contents:
+            parsed_terms.setdefault(field, []).append(token)
+
+        return parsed_terms

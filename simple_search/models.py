@@ -1,3 +1,5 @@
+import itertools
+
 from django.db import models
 
 from base_models import AbstractIndex, AbstractIndexRecord
@@ -46,7 +48,7 @@ class Index(AbstractIndex):
             instance_db_table=instance._meta.db_table, instance_pk=instance.pk).all()
 
     def search(self, model_class, search_string, per_page=50, current_page=1, total_pages=10, **filters):
-        terms = self.parse_terms(search_string)
+        terms = list(itertools.chain(*self.parse_terms(search_string).values()))
 
         obj_weights = self._get_matches(terms, extra_filters={'instance_db_table': model_class._meta.db_table})
         matches_in_order = self._get_result_order(obj_weights, per_page, current_page, total_pages)
