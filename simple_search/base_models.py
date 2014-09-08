@@ -231,7 +231,10 @@ class AbstractIndex(object):
         obj_weights = {}
 
         for match in matches:
-            obj_weights.setdefault(match, []).append(matching_terms[match.iexact])
+            try:
+                obj_weights.setdefault(match, []).append(matching_terms[match.iexact])
+            except:
+                logging.critical("[_get_matches] %s wasn't found in matching_terms. Not adding this match to obj_weights" % match.iexact)
 
         return obj_weights
 
