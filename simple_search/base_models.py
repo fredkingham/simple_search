@@ -109,14 +109,14 @@ class AbstractIndex(object):
             Indexing an object will always unindex the object first.
         """
         if db.is_in_transaction() or defer_index:
-            defer(self.reindex, obj, fields_to_index, _queue=QUEUE_FOR_INDEXING)
+            defer(self.reindex, obj, fields_to_index, defer_index=defer_index, _queue=QUEUE_FOR_INDEXING)
         else:
-            self.reindex(obj, fields_to_index)
+            self.reindex(obj, fields_to_index, defer_index=defer_index)
 
-    def reindex(self, obj, fields_to_index):
+    def reindex(self, obj, fields_to_index, defer_index=True):
         """ Unindex the object, then call _do_index to do the actual indexing work. """
         self.unindex(obj)
-        self._do_index(obj, fields_to_index)
+        self._do_index(obj, fields_to_index, defer_index=defer_index)
 
     def unindex(self, obj):
         """ Unindex an object by deleting all records referencing it. """
@@ -178,7 +178,7 @@ class AbstractIndex(object):
                 time.sleep(1)
                 continue
 
-    def _do_index(self, obj, fields_to_index):
+    def _do_index(self, obj, fields_to_index, defer_index=True):
         """ Index an object. Fields_to_index can refer to instance attributes or dictionary keys,
             self.get_field_data is used to get the actual data, which can be overwritten for specific requirements.
         """
@@ -188,7 +188,10 @@ class AbstractIndex(object):
             for text in texts:
                 terms = self._generate_terms(text)
                 for term in terms:
-                    defer(self._index_term, obj, field, text, term, _queue=settings.QUEUE_FOR_INDEXING)
+                    if defer_index:
+                        defer(self._index_term, obj, field, text, term, _queue=settings.QUEUE_FOR_INDEXING)
+                    else:
+                        self._index_term(obj, field, text, term)
 
     def _weight_results(self, obj_weights):
         """
