@@ -156,6 +156,28 @@ class AbstractIndex(object):
                 terms.append(term)
         return terms
 
+    def _index_term(self, obj, field, text, term):
+        # FIXME: I've had to disable this transaction because get_or_create doesn't work inside transactions
+        # It also doesn't (reliably) work outside transactions. This can be reenabled once djangae has unique-caching.
+        #@db.transactional(xg=True)
+        def txn(term_):
+            #logging.info("Indexing: '%s', %s", term_, type(term_))
+
+            term_count = self.normalize(text).count(term_)
+            self.get_or_create_record(obj, field, term_, term_count)
+
+            counter, created = GlobalOccuranceCount.objects.get_or_create(pk=term_)
+            counter.count += term_count
+            counter.save()
+        while True:
+            try:
+                txn(term)
+                break
+            except db.TransactionFailedError:
+                logging.warning("Transaction collision, retrying!")
+                time.sleep(1)
+                continue
+
     def _do_index(self, obj, fields_to_index):
         """ Index an object. Fields_to_index can refer to instance attributes or dictionary keys,
             self.get_field_data is used to get the actual data, which can be overwritten for specific requirements.
@@ -166,26 +188,7 @@ class AbstractIndex(object):
             for text in texts:
                 terms = self._generate_terms(text)
                 for term in terms:
-                    # FIXME: I've had to disable this transaction because get_or_create doesn't work inside transactions
-                    # It also doesn't (reliably) work outside transactions. This can be reenabled once djangae has unique-caching.
-                    #@db.transactional(xg=True)
-                    def txn(term_):
-                        logging.info("Indexing: '%s', %s", term_, type(term_))
-
-                        term_count = self.normalize(text).count(term_)
-                        self.get_or_create_record(obj, field, term_, term_count)
-
-                        counter, created = GlobalOccuranceCount.objects.get_or_create(pk=term_)
-                        counter.count += term_count
-                        counter.save()
-                    while True:
-                        try:
-                            txn(term)
-                            break
-                        except db.TransactionFailedError:
-                            logging.warning("Transaction collision, retrying!")
-                            time.sleep(1)
-                            continue
+                    defer(self._index_term, obj, field, text, term, _queue=settings.QUEUE_FOR_INDEXING)
 
     def _weight_results(self, obj_weights):
         """
