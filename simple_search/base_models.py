@@ -122,7 +122,7 @@ class AbstractIndex(object):
         """ Unindex an object by deleting all records referencing it. """
 
         records = self._get_records(obj)
-        for record in records:
+        for record in list(records):
             record.delete()
 
     def _generate_terms(self, text):
