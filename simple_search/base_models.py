@@ -182,6 +182,7 @@ class AbstractIndex(object):
         """ Index an object. Fields_to_index can refer to instance attributes or dictionary keys,
             self.get_field_data is used to get the actual data, which can be overwritten for specific requirements.
         """
+        logging.info("[SIMPLE_SEARCH] Indexing object %s, spawning _index_term tasks" % obj)
         for field in fields_to_index:
             texts = self.get_field_data(field, obj)
 
