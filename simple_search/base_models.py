@@ -123,7 +123,10 @@ class AbstractIndex(object):
 
         records = self._get_records(obj)
         for record in list(records):
-            record.delete()
+            try:
+                record.delete()
+            except AssertionError:
+                logging.exception("Something went wrong while unindexing an index record.")
 
     def _generate_terms(self, text):
         """ Takes a string, splits it into words and generates a list of combinations of adjacent words.
