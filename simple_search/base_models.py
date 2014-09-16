@@ -162,10 +162,10 @@ class AbstractIndex(object):
         # FIXME: I've had to disable this transaction because get_or_create doesn't work inside transactions
         # It also doesn't (reliably) work outside transactions. This can be reenabled once djangae has unique-caching.
         #@db.transactional(xg=True)
+        text = ' '.join(self.canonicalize(text))
         def txn(term_):
             #logging.info("Indexing: '%s', %s", term_, type(term_))
-
-            term_count = self.canonicalize(text).count(term_)
+            term_count = text.count(term_)
             self.get_or_create_record(obj, field, term_, term_count)
 
             counter, created = GlobalOccuranceCount.objects.get_or_create(pk=term_)
