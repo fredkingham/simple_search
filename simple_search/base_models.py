@@ -2,6 +2,7 @@ import logging
 import re
 import time
 
+import nltk
 from django.db import models
 from django.utils.encoding import smart_unicode
 from google.appengine.ext import db
@@ -139,15 +140,13 @@ class AbstractIndex(object):
         if text is None:
             return []
 
-        text = self.normalize(text)
-
-        words = text.split()  # Split on whitespace
+        stems = self.canonicalize(text)
 
         terms = []
         #Build up combinations of adjacent words
-        for i in xrange(0, len(words)):
+        for i in xrange(0, len(stems)):
             for j in xrange(1, 5):
-                term_words = words[i:i+j]
+                term_words = stems[i:i+j]
 
                 if len(term_words) != j:
                     break
@@ -163,10 +162,10 @@ class AbstractIndex(object):
         # FIXME: I've had to disable this transaction because get_or_create doesn't work inside transactions
         # It also doesn't (reliably) work outside transactions. This can be reenabled once djangae has unique-caching.
         #@db.transactional(xg=True)
+        text = ' '.join(self.canonicalize(text))
         def txn(term_):
             #logging.info("Indexing: '%s', %s", term_, type(term_))
-
-            term_count = self.normalize(text).count(term_)
+            term_count = text.count(term_)
             self.get_or_create_record(obj, field, term_, term_count)
 
             counter, created = GlobalOccuranceCount.objects.get_or_create(pk=term_)
@@ -308,6 +307,32 @@ class AbstractIndex(object):
 
         raise Exception("Object type %s is not supported by index. Add a get_<type.lower()>_data function to support it.", obj_classname)
 
+    @classmethod
+    def canonicalize(cls, raw, remove_stopwords=True, do_stemming=True):
+        """ :param remove_stopwords: Remove words like 'the', 'a' 'an' etc.
+            :param do_stemming: Return stem version of word, i.e. [walk walking walked] -> walk
+        """
+        if remove_stopwords:
+            stopwords = nltk.corpus.stopwords.words('english')  # todo support other languages
+
+        if do_stemming:
+            stemmer = nltk.stem.porter.PorterStemmer()
+
+        normalized = cls.normalize(raw)
+        tokenized = nltk.word_tokenize(normalized)
+
+        tokens = []
+        for token in tokenized:
+            if remove_stopwords and token in stopwords:
+                continue
+            if do_stemming:
+                token = stemmer.stem(token)
+                if not token.strip(":\""):  # remove any renmants of fields
+                    continue
+            tokens.append(token.lower())
+
+        return tokens
+
     @staticmethod
     def normalize(s):
         return smart_unicode(s).lower()
@@ -343,8 +368,21 @@ class AbstractIndex(object):
         fields = [match[0] if len(match) == 1 else None for match in [re.findall(split_field, token) for token in tokens]]
         field_contents = map(get_field_content, tokens, fields)
 
-        parsed_terms = {}
+        raw_parsed_terms = {}
         for field, token in field_contents:
-            parsed_terms.setdefault(field, []).append(token)
+            raw_parsed_terms.setdefault(field, []).append(token)
+
+
+        parsed_terms = {field: [] for field in raw_parsed_terms}
+        for field, tokens in raw_parsed_terms.iteritems():
+            unquoted = []
+            for token in tokens:
+                if re.search(r'\s', token):
+                    parsed_terms[field].append(token)
+                else:
+                    unquoted.append(token)
+
+            canon_terms = cls.canonicalize(' '.join(unquoted))
+            parsed_terms[field].extend(canon_terms)
 
         return parsed_terms

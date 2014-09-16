@@ -58,37 +58,37 @@ class SearchTests(TestCase):
         i = index
         i.index(instance1, ["field1"], defer_index=False)
 
-        self.assertEqual(1, IndexRecord.objects.filter(iexact="bananas").count())
-        self.assertEqual(1, IndexRecord.objects.filter(iexact="bananas apples").count())
-        self.assertEqual(1, IndexRecord.objects.filter(iexact="bananas apples cherries").count())
-        self.assertEqual(1, IndexRecord.objects.filter(iexact="bananas apples cherries plums").count())
+        self.assertEqual(1, IndexRecord.objects.filter(iexact="banana").count())
+        self.assertEqual(1, IndexRecord.objects.filter(iexact="banana appl").count())
+        self.assertEqual(1, IndexRecord.objects.filter(iexact="banana appl cherri").count())
+        self.assertEqual(1, IndexRecord.objects.filter(iexact="banana appl cherri plum").count())
 
         #We only store up to 4 adjacent words
-        self.assertEqual(0, IndexRecord.objects.filter(iexact="bananas apples cherries plums oranges").count())
+        self.assertEqual(0, IndexRecord.objects.filter(iexact="banana apple cherri plum orang").count())
 
-        self.assertEqual(1, IndexRecord.objects.filter(iexact="apples").count())
-        self.assertEqual(1, IndexRecord.objects.filter(iexact="apples cherries").count())
-        self.assertEqual(1, IndexRecord.objects.filter(iexact="apples cherries plums").count())
-        self.assertEqual(1, IndexRecord.objects.filter(iexact="apples cherries plums oranges").count())
+        self.assertEqual(1, IndexRecord.objects.filter(iexact="appl").count())
+        self.assertEqual(1, IndexRecord.objects.filter(iexact="appl cherri").count())
+        self.assertEqual(1, IndexRecord.objects.filter(iexact="appl cherri plum").count())
+        self.assertEqual(1, IndexRecord.objects.filter(iexact="appl cherri plum orang").count())
 
         #We only store up to 4 adjacent words
-        self.assertEqual(0, IndexRecord.objects.filter(iexact="apples cherries plums oranges kiwis").count())
+        self.assertEqual(0, IndexRecord.objects.filter(iexact="appl cherri plum orange kiwi").count())
 
     def test_ordering(self):
-        instance1 = SampleModel.objects.create(field1="eat a fish")
-        instance2 = SampleModel.objects.create(field1="eat a chicken")
-        instance3 = SampleModel.objects.create(field1="sleep a lot")
+        instance1 = SampleModel.objects.create(field1="a search term with some unique words banana fish")
+        instance2 = SampleModel.objects.create(field1="another search term with a unique word fish")
+        instance3 = SampleModel.objects.create(field1="not so unique")
 
         index.index(instance1, ["field1"], defer_index=False)
         index.index(instance2, ["field1"], defer_index=False)
         index.index(instance3, ["field1"], defer_index=False)
 
-        results = index.search(SampleModel, "eat a")
+        results = index.search(SampleModel, "search unique words")
 
         #Instance 3 should come last, because it only contains "a"
         self.assertEqual(instance3, results[2], results)
 
-        results = index.search(SampleModel, "eat fish")
+        results = index.search(SampleModel, "banana fish")
 
         self.assertEqual(instance1, results[0])  # Instance 1 matches 2 uncommon words
         self.assertEqual(instance2, results[1])  # Instance 2 matches 1 uncommon word
@@ -104,20 +104,20 @@ class SearchTests(TestCase):
         index.index(instance1, ["field1", "field2"], defer_index=False)
         self.assertEqual(2, IndexRecord.objects.count())
         self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="banana").count)
-        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="apple").count)
+        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="appl").count)
 
         index.index(instance2, ["field1", "field2"], defer_index=False)
 
         self.assertEqual(4, IndexRecord.objects.count())
         self.assertEqual(2, GlobalOccuranceCount.objects.get(pk="banana").count)
-        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="apple").count)
-        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="cherry").count)
+        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="appl").count)
+        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="cherri").count)
 
         index.index(instance3, ["field1"], defer_index=False)
         self.assertEqual(5, IndexRecord.objects.count())
         self.assertEqual(3, GlobalOccuranceCount.objects.get(pk="banana").count)
-        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="apple").count)
-        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="cherry").count)
+        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="appl").count)
+        self.assertEqual(1, GlobalOccuranceCount.objects.get(pk="cherri").count)
 
         self.assertItemsEqual([instance1, instance2, instance3], index.search(SampleModel, "banana"))
         self.assertItemsEqual([instance2], index.search(SampleModel, "cherry"))
@@ -196,5 +196,11 @@ class ParseTermsTests(TestCase):
         self.assertEqual(AbstractIndex.parse_terms("test"), {None:["test"]})
         self.assertEqual(AbstractIndex.parse_terms("test field:test1, other_field:test2"), {None:["test"], "field":["test1"], "other_field":["test2"]})
         self.assertEqual(AbstractIndex.parse_terms("test1 test2"), {None:["test1", "test2"]})
-        self.assertEqual(AbstractIndex.parse_terms("This: is multiple things"), {None:["this:", "is", "multiple", "things"]})
-        self.assertEqual(AbstractIndex.parse_terms("This:is also multiple things"), {"this":["is"], None:["also", "multiple", "things"]})
+        self.assertEqual(AbstractIndex.parse_terms("This: is multiple things"), {None:["multipl", "thing"]})
+        self.assertEqual(AbstractIndex.parse_terms("key:value also multiple things"), {"key":["valu"], None:["also", "multipl", "thing"]})
+
+class CanonicalizeTests(TestCase):
+    def test_canonicalize(self):
+        self.assertEqual(AbstractIndex.canonicalize("a it the development at if"), ["develop"])
+        self.assertEqual(AbstractIndex.canonicalize("a it the development at if", remove_stopwords=False), ["a", "it", "the", "develop", "at", "if"])
+        self.assertEqual(AbstractIndex.canonicalize("a it the development at if", do_stemming=False), ["development"])
