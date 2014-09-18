@@ -1,3 +1,5 @@
+# -*- encoding: utf-8 -*-
+
 import logging
 import re
 import time
@@ -335,6 +337,10 @@ class AbstractIndex(object):
 
     @staticmethod
     def normalize(s):
+        whitespace_characters = u'|/-–—~'
+        for char in whitespace_characters:
+            s = s.replace(char, ' ')
+        # Replace some characters with whitespace
         return smart_unicode(s).lower()
 
     @classmethod
