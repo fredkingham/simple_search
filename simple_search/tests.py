@@ -127,6 +127,9 @@ class SearchTests(TestCase):
         self.assertItemsEqual([instance2, instance3], index.search(SampleModel, "banana"))
         self.assertItemsEqual([instance2], index.search(SampleModel, "cherry"))
 
+    def test_empty_search(self):
+        index.search(SampleModel, '""')
+
     def test_additional_filters(self):
         instance1 = SampleModel.objects.create(field1="banana", field2="apple")
         instance2 = SampleModel.objects.create(field1="banana", field2="cherry")

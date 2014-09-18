@@ -383,12 +383,16 @@ class AbstractIndex(object):
         for field, tokens in raw_parsed_terms.iteritems():
             unquoted = []
             for token in tokens:
+                # # Remove empty values
+                # if not token:
+                #     continue
+
                 if re.search(r'\s', token):
                     parsed_terms[field].append(token)
                 else:
                     unquoted.append(token)
 
             canon_terms = cls.canonicalize(' '.join(unquoted))
-            parsed_terms[field].extend(canon_terms)
 
+            parsed_terms[field].extend(canon_terms)
         return parsed_terms
