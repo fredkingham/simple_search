@@ -393,7 +393,7 @@ class AbstractIndex(object):
                 #     continue
 
                 if re.search(r'\s', token):
-                    parsed_terms[field].append(token)
+                    parsed_terms[field].append(" ".join(cls.canonicalize(token)))
                 else:
                     unquoted.append(token)
 
