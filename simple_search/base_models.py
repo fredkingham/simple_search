@@ -332,6 +332,11 @@ class AbstractIndex(object):
                 token = stemmer.stem(token)
                 if not token.strip(":\""):  # remove any renmants of fields
                     continue
+            if token.startswith("__"):
+                # Remove leading underscores. GlobalOccuranceCounts use the token as a primary key,
+                # and the datastore doesn't allow pks that start with underscores.
+                token = re.sub("^_+", "", token)
+
             tokens.append(token.lower())
 
         return tokens

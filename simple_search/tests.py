@@ -127,6 +127,12 @@ class SearchTests(TestCase):
         self.assertItemsEqual([instance2, instance3], index.search(SampleModel, "banana"))
         self.assertItemsEqual([instance2], index.search(SampleModel, "cherry"))
 
+    def test_leading_underscore_search(self):
+        instance1 = SampleModel.objects.create(field1="__testing__", field2="Apple")
+        index.index(instance1, ["field1", "field2"], defer_index=False)
+        self.assertItemsEqual([instance1], index.search(SampleModel, "__testing__"))
+        self.assertItemsEqual([instance1], index.search(SampleModel, "testing__"))
+
     def test_empty_search(self):
         index.search(SampleModel, '""')
 
@@ -207,3 +213,4 @@ class CanonicalizeTests(TestCase):
         self.assertEqual(AbstractIndex.canonicalize("a it the development at if"), ["develop"])
         self.assertEqual(AbstractIndex.canonicalize("a it the development at if", remove_stopwords=False), ["a", "it", "the", "develop", "at", "if"])
         self.assertEqual(AbstractIndex.canonicalize("a it the development at if", do_stemming=False), ["development"])
+        self.assertEqual(AbstractIndex.canonicalize("how__ do you like __dem__ apples",), ["how__", "like", "dem__", "appl"])
