@@ -3,7 +3,6 @@
 import logging
 import re
 import time
-from collections import defaultdict
 
 import nltk
 from django.db import models
@@ -355,32 +354,50 @@ class AbstractIndex(object):
             this returns a dict of {label:[search_tokens]}
 
             Examples:
-            "This:is not a field" -> {None: ["This:is", "not", "a", field"]}
-            This:"is a field" -> {"This": ["is", "a", "field"]}
+            "This:isn't a field" -> {None: ["This:isn't a field"]}
+            This:"is a field" -> {"This": ["is a field"]}
             This:is multiple things -> {"This": ["is"], None: ["multiple", "things"]}
         """
-        i = 0
-        cln, qte = ':"'
         search_string = cls.normalize(search_string)
-        tokens = re.split(r'\s', search_string)
-        fields = defaultdict(list)
 
-        while i < len(tokens):
-            token = tokens[i]
-            # deal with fields first
-            if cln in token and not token.startswith(qte) and not token.endswith(cln):
-                field, token = token.split(cln)
+        split_by_space = r'(?:[^\s,"]|"(?:\\.|[^"])*")+'
+        split_field = r'^(?P<field>[^:"]+):[^ ]+'
 
-                # associate all tokens within quotes with current field
-                if token.startswith(qte):
-                    while not token.endswith(qte) and i+2 < len(tokens):
-                        fields[field].append(token.strip(qte))
-                        i += 1
-                        token = tokens[i]
+        def get_field_content(token, field):
+            if field:
+                token = re.sub(field+":", '', token)
 
-                fields[field].append(token.strip(qte + ','))
-            else:
-                fields[None].append(token.strip(qte))
-            i += 1
+            if token.startswith('"') and token.endswith('"'):
+                token = token[1:-1]
 
-        return {field: cls.canonicalize(' '.join(tokens)) for field, tokens in fields.items()}
+            return field, token
+
+        # Separate search text into two lists with one entry per search term:
+        #   fields: field name to be searched(or None)
+        #   search_strings: actual string to search for
+        tokens = [s for s in re.findall(split_by_space, search_string)]
+        fields = [match[0] if len(match) == 1 else None for match in [re.findall(split_field, token) for token in tokens]]
+        field_contents = map(get_field_content, tokens, fields)
+
+        raw_parsed_terms = {}
+        for field, token in field_contents:
+            raw_parsed_terms.setdefault(field, []).append(token)
+
+
+        parsed_terms = {field: [] for field in raw_parsed_terms}
+        for field, tokens in raw_parsed_terms.iteritems():
+            unquoted = []
+            for token in tokens:
+                # # Remove empty values
+                # if not token:
+                #     continue
+
+                if re.search(r'\s', token):
+                    parsed_terms[field].append(token)
+                else:
+                    unquoted.append(token)
+
+            canon_terms = cls.canonicalize(' '.join(unquoted))
+
+            parsed_terms[field].extend(canon_terms)
+        return parsed_terms
