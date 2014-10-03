@@ -342,7 +342,7 @@ class AbstractIndex(object):
 
     @staticmethod
     def normalize(s):
-        whitespace_characters = u'|/-–—~'
+        whitespace_characters = u'|/-–—~,.;:!?'
         for char in whitespace_characters:
             s = s.replace(char, ' ')
         # Replace some characters with whitespace
