@@ -348,6 +348,16 @@ class AbstractIndex(object):
         # Replace some characters with whitespace
         return smart_unicode(s).lower()
 
+    @staticmethod
+    def split_by_space(s, remove_quotes=False):
+        split_by_space = r'(?:[^\s,"]|"(?:\\.|[^"])*")+'
+        results = []
+        for result in re.findall(split_by_space, s):
+            if remove_quotes and result.startswith('"') and result.endswith('"'):
+                result = result[1:-1]
+            results.append(result)
+        return results
+
     @classmethod
     def parse_terms(cls, search_string):
         """ For a string containing several search terms, which can have be labeled and/or grouped with quotes,
@@ -360,7 +370,6 @@ class AbstractIndex(object):
         """
         search_string = cls.normalize(search_string)
 
-        split_by_space = r'(?:[^\s,"]|"(?:\\.|[^"])*")+'
         split_field = r'^(?P<field>[^:"]+):[^ ]+'
 
         def get_field_content(token, field):
@@ -375,7 +384,8 @@ class AbstractIndex(object):
         # Separate search text into two lists with one entry per search term:
         #   fields: field name to be searched(or None)
         #   search_strings: actual string to search for
-        tokens = [s for s in re.findall(split_by_space, search_string)]
+
+        tokens = cls.split_by_space(search_string)
         fields = [match[0] if len(match) == 1 else None for match in [re.findall(split_field, token) for token in tokens]]
         field_contents = map(get_field_content, tokens, fields)
 
