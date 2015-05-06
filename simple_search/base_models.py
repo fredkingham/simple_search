@@ -399,8 +399,8 @@ class AbstractIndex(object):
             unquoted = []
             for token in tokens:
                 # # Remove empty values
-                # if not token:
-                #     continue
+                if not token:
+                    continue
 
                 if re.search(r'\s', token):
                     parsed_terms[field].append(" ".join(cls.canonicalize(token)))
